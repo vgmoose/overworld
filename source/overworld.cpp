@@ -26,10 +26,10 @@ static void *frameBuffer[2] = { NULL, NULL};
 static GXRModeObj *rmode;
 
 #define NUM_SPRITES 3
-#define CYAN 0
-#define RED 1
-#define BLUE 2
-#define YELLOW 3
+#define UP 0
+#define LEFT 1
+#define DOWN 2
+#define RIGHT 3
 #define WHITE {0xff, 0xff, 0xff, 0xff};
 #define BLACK {0, 0, 0, 0xff};
 
@@ -39,15 +39,18 @@ typedef struct {
 	int x,y;			// screen co-ordinates 
 	int dx, dy;			// velocity
 	int image;
+    int sheet;         // orientation
 }Sprite;
 
 Sprite sprites[NUM_SPRITES];
 
 GXTexObj texObj;
 
-void drawSpriteTex( int x, int y, int width, int height, int image );
+void drawSpriteTex( int x, int y, int width, int height, int image, int sprite);
 int otherBallCollide(int x, int y);
 void singleColor( int color );
+TPLFile spriteTPL;
+
 
 static void *xfb = NULL;
 
@@ -140,7 +143,6 @@ int main( int argc, char **argv ){
 
 	GX_InvalidateTexAll();
 
-	TPLFile spriteTPL;
 	TPL_OpenTPLFromMemory(&spriteTPL, (void *)textures_tpl,textures_tpl_size);
 	TPL_GetTexture(&spriteTPL,ballsprites,&texObj);
 	GX_LoadTexObj(&texObj, GX_TEXMAP0);
@@ -164,7 +166,13 @@ int main( int argc, char **argv ){
 			sprites[i].dx = -sprites[i].dx;
 		if(rand() & 1)
 			sprites[i].dy = -sprites[i].dy;
+        
+        sprites[i].sheet = 0;
+        
 	}
+    
+    sprites[0].sheet = 2;
+    sprites[0].dx = 0x10ff;
     
     MP3Player_PlayBuffer(sample_mp3, sample_mp3_size, NULL);
 
@@ -177,11 +185,19 @@ int main( int argc, char **argv ){
         if (WPAD_ButtonsDown(0) & WPAD_BUTTON_A){
             GXColor hi = BLACK;
             GX_SetCopyClear(hi, 0x00ffffff);
+            TPL_GetTexture(&spriteTPL,ballsprites,&texObj);
+            GX_LoadTexObj(&texObj, GX_TEXMAP0);
+
+
         }
         
         if (WPAD_ButtonsDown(0) & WPAD_BUTTON_B){
             GXColor hi = WHITE;
             GX_SetCopyClear(hi, 0x00ffffff);
+            TPL_GetTexture(&spriteTPL,ballsprites2,&texObj);
+            GX_LoadTexObj(&texObj, GX_TEXMAP0);
+
+
 //            swapVelocities(0,1);
         }
         
@@ -200,19 +216,41 @@ int main( int argc, char **argv ){
 		guMtxTransApply (GXmodelView2D, GXmodelView2D, 0.0F, 0.0F, -5.0F);
 		GX_LoadPosMtxImm(GXmodelView2D,GX_PNMTX0);
         
-        if (WPAD_ButtonsHeld(0) & WPAD_BUTTON_UP)sprites[0].x-=0x10ff;
-        if (WPAD_ButtonsHeld(0) & WPAD_BUTTON_DOWN) sprites[0].x+=0x10ff;
-        if (WPAD_ButtonsHeld(0) & WPAD_BUTTON_LEFT) sprites[0].y+=0x10ff;
-        if (WPAD_ButtonsHeld(0) & WPAD_BUTTON_RIGHT) sprites[0].y-=0x10ff;
+        if (WPAD_ButtonsHeld(0) & WPAD_BUTTON_UP)   // moving left
+        {
+            sprites[0].x-=sprites[0].dx;
+            if (sprites[0].image == 0) sprites[0].image = 1;
+            else sprites[0].image =0;
+            sprites[0].sheet = 1; // horizontal
+        }
+        if (WPAD_ButtonsHeld(0) & WPAD_BUTTON_DOWN) // moving right
+        {
+            sprites[0].x+=sprites[0].dx;
+            if (sprites[0].image == 2) sprites[0].image = 3;
+            else sprites[0].image =2;
+            sprites[0].sheet = 1; // horizontal
+        }
+        if (WPAD_ButtonsHeld(0) & WPAD_BUTTON_LEFT) // moving down
+        {
+           sprites[0].y+=sprites[0].dx;
+            if (sprites[0].image == 0) sprites[0].image = 1;
+            else sprites[0].image =0;
+            sprites[0].sheet = 2; // vertical
+        }
+        if (WPAD_ButtonsHeld(0) & WPAD_BUTTON_RIGHT) // moving up
+        {
+            sprites[0].y-=sprites[0].dx;
+            if (sprites[0].image == 2) sprites[0].image = 3;
+            else sprites[0].image =2;
+            sprites[0].sheet = 2; // vertical
+        }
         
-   
+        
+		for(i = 1; i < NUM_SPRITES; i++) {
 
-		for(i = 0; i < NUM_SPRITES; i++) {
-            if (i!=0)
-            {
 			sprites[i].x += sprites[i].dx;
 			sprites[i].y += sprites[i].dy;
-            }
+            
 			
 			//check for collision with the screen boundaries
 			if(sprites[i].x < (1<<8) || sprites[i].x > ((640-32) << 8))
@@ -222,8 +260,10 @@ int main( int argc, char **argv ){
 				sprites[i].dy = -sprites[i].dy;
             
 
-			drawSpriteTex( sprites[i].x >> 8, sprites[i].y >> 8, 32, 32, sprites[i].image);
+			drawSpriteTex( sprites[i].x >> 8, sprites[i].y >> 8, 32, 32, sprites[i].image, sprites[i].sheet);
 		}
+        
+        		drawSpriteTex( sprites[0].x >> 8, sprites[0].y >> 8, 32, 32, sprites[0].image, sprites[0].sheet);
 
 		GX_DrawDone();
 		
@@ -238,9 +278,9 @@ int main( int argc, char **argv ){
 			VIDEO_SetBlack(FALSE);
 			first_frame = 0;
 		}
-        printf("\x1b[2;0H");
-        
-        printf("Hello there");
+//        printf("\x1b[2;0H");
+//        
+//        printf("Hello there");
 
 		VIDEO_Flush();
         
@@ -272,10 +312,25 @@ void singleColor(int color)
 }
 
 //---------------------------------------------------------------------------------
-void drawSpriteTex( int x, int y, int width, int height, int image ) {
+void drawSpriteTex( int x, int y, int width, int height, int image, int sheet) {
 //---------------------------------------------------------------------------------
 
 	int texIndex = image * 8;
+    
+    switch (sheet)
+    {
+        case 1:
+            TPL_GetTexture(&spriteTPL,link_horiz,&texObj);
+            GX_LoadTexObj(&texObj, GX_TEXMAP0);
+            break;
+        case 2:
+            TPL_GetTexture(&spriteTPL,link_vert,&texObj);
+            GX_LoadTexObj(&texObj, GX_TEXMAP0);
+            break;
+        default:
+            TPL_GetTexture(&spriteTPL,ballsprites,&texObj);
+            GX_LoadTexObj(&texObj, GX_TEXMAP0);
+    }
 
 	GX_Begin(GX_QUADS, GX_VTXFMT0, 4);			// Draw A Quad
 		GX_Position2f32(x, y);					// Top Left

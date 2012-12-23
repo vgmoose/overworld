@@ -1,1 +1,4 @@
 <filepath="ballsprites.png" id="ballsprites" colfmt=6 />
+<filepath="ballsprites2.png" id="ballsprites2" colfmt=6 />
+<filepath="link_horiz.png" id="link_horiz" colfmt=6 />
+<filepath="link_vert.png" id="link_vert" colfmt=6 />
