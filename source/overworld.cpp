@@ -49,6 +49,9 @@ void drawSpriteTex( int x, int y, int width, int height, int image );
 int otherBallCollide(int x, int y);
 void singleColor( int color );
 
+static void *xfb = NULL;
+
+
 //---------------------------------------------------------------------------------
 int main( int argc, char **argv ){
 //---------------------------------------------------------------------------------
@@ -60,6 +63,7 @@ int main( int argc, char **argv ){
 	Mtx GXmodelView2D;
 	void *gp_fifo = NULL;
 
+
 	GXColor background = WHITE;
 
 	int i;
@@ -70,6 +74,12 @@ int main( int argc, char **argv ){
 	MP3Player_Init();
  
 	rmode = VIDEO_GetPreferredMode(NULL);
+    
+    xfb = MEM_K0_TO_K1(SYS_AllocateFramebuffer(rmode));
+
+    
+    console_init(xfb,20,20,rmode->fbWidth,rmode->xfbHeight,rmode->fbWidth*VI_DISPLAY_PIX_SZ);
+
 	
 	fb = 0;
 	first_frame = 1;
@@ -190,10 +200,12 @@ int main( int argc, char **argv ){
 		guMtxTransApply (GXmodelView2D, GXmodelView2D, 0.0F, 0.0F, -5.0F);
 		GX_LoadPosMtxImm(GXmodelView2D,GX_PNMTX0);
         
-        if (WPAD_ButtonsDown(0) & WPAD_BUTTON_UP)sprites[0].x-=0x10ff;
-        if (WPAD_ButtonsDown(0) & WPAD_BUTTON_DOWN) sprites[0].x+=0x10ff;
-        if (WPAD_ButtonsDown(0) & WPAD_BUTTON_LEFT) sprites[0].y+=0x10ff;
-        if (WPAD_ButtonsDown(0) & WPAD_BUTTON_RIGHT) sprites[0].y-=0x10ff;
+        if (WPAD_ButtonsHeld(0) & WPAD_BUTTON_UP)sprites[0].x-=0x10ff;
+        if (WPAD_ButtonsHeld(0) & WPAD_BUTTON_DOWN) sprites[0].x+=0x10ff;
+        if (WPAD_ButtonsHeld(0) & WPAD_BUTTON_LEFT) sprites[0].y+=0x10ff;
+        if (WPAD_ButtonsHeld(0) & WPAD_BUTTON_RIGHT) sprites[0].y-=0x10ff;
+        
+   
 
 		for(i = 0; i < NUM_SPRITES; i++) {
             if (i!=0)
@@ -226,10 +238,17 @@ int main( int argc, char **argv ){
 			VIDEO_SetBlack(FALSE);
 			first_frame = 0;
 		}
+        printf("\x1b[2;0H");
+        
+        printf("Hello there");
+
 		VIDEO_Flush();
+        
 		VIDEO_WaitVSync();
 		fb ^= 1;		// flip framebuffer
 	}
+    
+    
 	return 0;
 }
 
